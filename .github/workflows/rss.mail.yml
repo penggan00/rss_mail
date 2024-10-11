@@ -22,6 +22,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt  # 假设你有一个 requirements.txt 文件
 
+      - name: Run mail.py
         env:  # 通过环境变量传递必要的信息
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
@@ -47,4 +48,4 @@ jobs:
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           IMAP_SERVER: ${{ secrets.IMAP_SERVER }}
-        run: python rss.py
+        run: python rss.py  # 运行你的脚本，替换为实际脚本名
