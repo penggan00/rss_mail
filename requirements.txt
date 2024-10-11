@@ -1,0 +1,12 @@
+requests
+html2text
+python-telegram-bot
+beautifulsoup4
+langdetect
+markdownify
+mysql-connector-python
+pytz
+# 以下是rss
+feedparser
+aiomysql
+aiohttp
