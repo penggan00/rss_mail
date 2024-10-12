@@ -1,4 +1,4 @@
-name: Fetch Emails
+name: Emails 
 
 on:
   schedule:

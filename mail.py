@@ -12,10 +12,6 @@ from bs4 import BeautifulSoup
 from email.utils import parsedate_to_datetime
 from telegram.helpers import escape_markdown
 
-# 设置日志记录并分级
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger()
-
 # 从环境变量中读取邮箱信息
 email_user = os.getenv('EMAIL_USER')
 email_password = os.getenv('EMAIL_PASSWORD')
