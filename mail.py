@@ -18,20 +18,20 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(fi
 logger = logging.getLogger()
 
 # 设置邮箱信息
-email_user = os.environ.get("EMAIL_USER")
-email_password = os.environ.get("EMAIL_PASSWORD")
-imap_server = os.environ.get("IMAP_SERVER")
+email_user = os.getenv("EMAIL_USER")
+email_password = os.getenv("EMAIL_PASSWORD")
+imap_server = "imap.qq.com"
 
 # 设置 Telegram 信息
-TELEGRAM_API_KEY = os.environ.get("TELEGRAM_API_KEY")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+TELEGRAM_API_KEY = os.getenv("TELEGRAM_API_KEY")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 # 设置 MySQL 连接池
 dbconfig = {
-    "host": os.environ.get("DB_HOST"),
-    "database": os.environ.get("DB_DATABASE"),
-    "user": os.environ.get("DB_USER"),
-    "password": os.environ.get("DB_PASSWORD"),
+    "host": os.getenv("DB_HOST"),
+    "database": os.getenv("DB_NAME"),
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASSWORD"),
     "pool_name": "mypool",
     "pool_size": 5
 }
