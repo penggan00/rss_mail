@@ -2,7 +2,7 @@ name: Rss2
 
 on:
   schedule:
-    - cron: '15 */23 * * *'  # 每24小时执行一次
+    - cron: '0 1 * * *'  # 每天上午9点执行一次
   workflow_dispatch:  # 允许手动触发
 
 jobs:
