@@ -1,4 +1,4 @@
-import imaplib 
+import imaplib  
 import email
 import requests
 import os
@@ -11,26 +11,27 @@ from mysql.connector import pooling
 from bs4 import BeautifulSoup
 from email.utils import parsedate_to_datetime
 from telegram.helpers import escape_markdown
+import time
 
 # 设置日志记录并分级
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 logger = logging.getLogger()
 
-# 从环境变量中读取邮箱信息
-email_user = os.getenv('EMAIL_USER')
-email_password = os.getenv('EMAIL_PASSWORD')
-imap_server = os.getenv('IMAP_SERVER')
+# 设置邮箱信息
+email_user = os.environ.get("EMAIL_USER")
+email_password = os.environ.get("EMAIL_PASSWORD")
+imap_server = os.environ.get("IMAP_SERVER")
 
-# 从环境变量中读取 Telegram 信息
-TELEGRAM_API_KEY = os.getenv('TELEGRAM_API_KEY')
-TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+# 设置 Telegram 信息
+TELEGRAM_API_KEY = os.environ.get("TELEGRAM_API_KEY")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
-# 从环境变量中读取 MySQL 连接信息并设置连接池
+# 设置 MySQL 连接池
 dbconfig = {
-    "host": os.getenv('DB_HOST'),
-    "database": os.getenv('DB_NAME'),
-    "user": os.getenv('DB_USER'),
-    "password": os.getenv('DB_PASSWORD'),
+    "host": os.environ.get("DB_HOST"),
+    "database": os.environ.get("DB_DATABASE"),
+    "user": os.environ.get("DB_USER"),
+    "password": os.environ.get("DB_PASSWORD"),
     "pool_name": "mypool",
     "pool_size": 5
 }
@@ -47,41 +48,35 @@ def get_connection():
 
 # 加载已发送的邮件记录
 def load_sent_mail():
-    connection = get_connection()
-    if connection is None:
-        return set()
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT message_id FROM sent_mail")
-            rows = cursor.fetchall()
-            sent_mail_ids = {row[0] for row in rows}
-            logger.info(f"Loaded sent mail IDs: {sent_mail_ids}")
-            return sent_mail_ids
-    except mysql.connector.Error as e:
-        logger.error(f"Error fetching sent mail IDs: {e}")
-        return set()
-    finally:
-        if connection:
-            connection.close()
+    with get_connection() as connection:
+        if connection is None:
+            return set()
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT message_id FROM sent_mail")
+                rows = cursor.fetchall()
+                sent_mail_ids = {row[0] for row in rows}
+                logger.info(f"Loaded sent mail IDs: {sent_mail_ids}")
+                return sent_mail_ids
+        except mysql.connector.Error as e:
+            logger.error(f"Error fetching sent mail IDs: {e}")
+            return set()
 
 # 批量保存已发送的邮件记录
 def save_sent_mail_to_db(mail_entries):
     if not mail_entries:
         return
-    connection = get_connection()
-    if connection is None:
-        return
-    try:
-        with connection.cursor() as cursor:
-            sql = "INSERT IGNORE INTO sent_mail (url, subject, message_id) VALUES (%s, %s, %s)"
-            cursor.executemany(sql, [(entry['url'], entry['subject'], entry['message_id']) for entry in mail_entries])
-            connection.commit()  # 批量提交事务
-            logger.info(f"Saved {len(mail_entries)} mail entries: {mail_entries}")
-    except mysql.connector.Error as e:
-        logger.error(f"Error saving sent mail: {e}")
-    finally:
-        if connection:
-            connection.close()
+    with get_connection() as connection:
+        if connection is None:
+            return
+        try:
+            with connection.cursor() as cursor:
+                sql = "INSERT IGNORE INTO sent_mail (url, subject, message_id) VALUES (%s, %s, %s)"
+                cursor.executemany(sql, [(entry['url'], entry['subject'], entry['message_id']) for entry in mail_entries])
+                connection.commit()
+                logger.info(f"Saved {len(mail_entries)} mail entries: {mail_entries}")
+        except mysql.connector.Error as e:
+            logger.error(f"Error saving sent mail: {e}")
 
 # 发送消息到 Telegram
 def send_message(text):
@@ -98,7 +93,7 @@ def send_message(text):
                 logger.warning(f"Telegram API rate limited, retrying after {retry_after} seconds")
                 time.sleep(retry_after)
             elif response.status_code == 200:
-                logger.info(f"Message part successfully sent: {message_part[:50]}...")  # 记录推送成功，显示前50字符
+                logger.info(f"Message part successfully sent: {message_part[:50]}...")
             else:
                 logger.error(f"Failed to send message part: {message_part[:50]}..., Status Code: {response.status_code}")
                 response.raise_for_status()
@@ -149,76 +144,75 @@ def fetch_emails():
     new_sent_mail = []
 
     try:
-        mail = imaplib.IMAP4_SSL(imap_server)
-        mail.login(email_user, email_password)
-        mail.select('inbox')
+        with imaplib.IMAP4_SSL(imap_server) as mail:
+            mail.login(email_user, email_password)
+            mail.select('inbox')
 
-        status, messages = mail.search(None, '(UNSEEN)')
-        if status != 'OK':
-            logger.error("Error searching for emails")
-            return
-        
-        email_ids = messages[0].split()
-        
-        for email_id in email_ids:
-            try:
-                _, msg_data = mail.fetch(email_id, '(RFC822)')
-                msg = email.message_from_bytes(msg_data[0][1])
+            status, messages = mail.search(None, '(UNSEEN)')
+            if status != 'OK':
+                logger.error("Error searching for emails")
+                return
+            
+            email_ids = messages[0].split()
+            
+            for email_id in email_ids:
+                try:
+                    _, msg_data = mail.fetch(email_id, '(RFC822)')
+                    msg = email.message_from_bytes(msg_data[0][1])
 
-                message_id = msg['Message-ID']
-                if not message_id:
-                    logger.warning(f"Email ID {email_id} has no Message-ID, generating a unique identifier.")
+                    message_id = msg['Message-ID']
+                    if not message_id:
+                        logger.warning(f"Email ID {email_id} has no Message-ID, generating a unique identifier.")
+                        subject = clean_subject(decode_header(msg['subject']))
+                        sender = decode_header(msg['from'])
+                        url = f"https://mail.qq.com/{sender}"
+                        message_id = f"{url}-{subject}"  # 组合 url 和 subject 生成唯一标识符
+
+                    if message_id in sent_mail:
+                        logger.info(f"Email already sent: {message_id}")
+                        continue
+
                     subject = clean_subject(decode_header(msg['subject']))
                     sender = decode_header(msg['from'])
-                    url = f"https://mail.qq.com/{sender}"
-                    message_id = f"{url}-{subject}"  # 组合 url 和 subject 生成唯一标识符
-
-                if message_id in sent_mail:
-                    logger.info(f"Email already sent: {message_id}")
-                    continue
-
-                subject = clean_subject(decode_header(msg['subject']))
-                sender = decode_header(msg['from'])
-                
-                # 检查邮件日期字段
-                date_str = msg.get('date')
-                if date_str is None:
-                    logger.warning(f"Email ID {email_id} has no Date header, using current time as fallback.")
-                    email_date_bj = datetime.now(pytz.timezone('Asia/Shanghai'))
-                else:
-                    try:
-                        email_date = parsedate_to_datetime(date_str)
-                        email_date_bj = email_date.astimezone(pytz.timezone('Asia/Shanghai'))
-                    except Exception as e:
-                        logger.warning(f"Error parsing date for email ID {email_id}: {e}, using current time as fallback.")
+                    
+                    # 检查邮件日期字段
+                    date_str = msg.get('date')
+                    if date_str is None:
+                        logger.warning(f"Email ID {email_id} has no Date header, using current time as fallback.")
                         email_date_bj = datetime.now(pytz.timezone('Asia/Shanghai'))
+                    else:
+                        try:
+                            email_date = parsedate_to_datetime(date_str)
+                            email_date_bj = email_date.astimezone(pytz.timezone('Asia/Shanghai'))
+                        except Exception as e:
+                            logger.warning(f"Error parsing date for email ID {email_id}: {e}, using current time as fallback.")
+                            email_date_bj = datetime.now(pytz.timezone('Asia/Shanghai'))
 
-                body = get_email_body(msg)
+                    body = get_email_body(msg)
 
-                url = f"https://mail.qq.com/{sender}"
+                    url = f"https://mail.qq.com/{sender}"
 
-                message = f'''
+                    message = f'''
 主题: {subject}
 发件人: {sender}
 时间: {email_date_bj.strftime('%Y-%m-%d %H:%M:%S')}
 内容:---
 {body}
 '''
-                send_message(message)
+                    send_message(message)
 
-                new_sent_mail.append({
-                    'url': url,
-                    'subject': subject,
-                    'message_id': message_id
-                })
+                    new_sent_mail.append({
+                        'url': url,
+                        'subject': subject,
+                        'message_id': message_id
+                    })
 
-            except Exception as e:
-                logger.error(f"Error processing email ID {email_id}: {e}")
+                except Exception as e:
+                    logger.error(f"Error processing email ID {email_id}: {e}")
 
     except Exception as e:
         logger.error(f"Error fetching emails: {e}")
     finally:
-        mail.logout()
         if new_sent_mail:
             save_sent_mail_to_db(new_sent_mail)
 

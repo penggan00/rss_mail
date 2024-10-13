@@ -1,61 +1,56 @@
-import os
-import asyncio  
+import asyncio   
 import aiohttp
 import aiomysql
 import logging
 import datetime
+import os
 from feedparser import parse
 from telegram import Bot
 
-# 读取环境变量
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-DB_HOST = os.getenv("DB_HOST")
-DB_NAME = os.getenv("DB_NAME")
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-ALLOWED_CHAT_IDS = os.getenv("ALLOWED_CHAT_IDS").split(",")
-MAX_TELEGRAM_MSG_LENGTH = 4096
+# 初始化日志记录器
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# RSS 源列表合并推送
+# RSS 源列表合并推送 定时24小时
 RSS_FEEDS = [
-    'https://blog.090227.xyz/atom.xml',  # CM
-    'https://www.freedidi.com/feed', # 零度解说
-    'https://rsshub.app/bilibili/hot-search', # bilibili
-    'https://rss.mifaw.com/articles/5c8bb11a3c41f61efd36683e/5c91d2e23882afa09dff4901', # 36氪 - 24小时热榜
-    'https://rss.mifaw.com/articles/5c8bb11a3c41f61efd36683e/5cac99a7f5648c90ed310e18', # 微博热搜
-    'https://rss.mifaw.com/articles/5c8bb11a3c41f61efd36683e/5cf92d7f0cc93bc69d082608', # 百度热搜榜
-    'https://rsshub.app/guancha/headline', # 观察网
-    'https://rsshub.app/zaobao/znews/china', # 联合早报
-    'https://36kr.com/feed',    # 36氪 
-    # 添加更多 RSS 源
+    'https://rsshub.app/bilibili/hot-search',
+    'https://rss.mifaw.com/articles/5c8bb11a3c41f61efd36683e/5c91d2e23882afa09dff4901',
+    'https://rss.mifaw.com/articles/5c8bb11a3c41f61efd36683e/5cac99a7f5648c90ed310e18',
+    'https://rss.mifaw.com/articles/5c8bb11a3c41f61efd36683e/5cf92d7f0cc93bc69d082608',
+    'https://rsshub.app/guancha/headline',
+    'https://rsshub.app/zaobao/znews/china',
+    'https://blog.090227.xyz/atom.xml',
+    'https://www.freedidi.com/feed',
+    'https://36kr.com/feed',
 ]
-# 数据库连接
-async def connect_to_db():
+
+# 从环境变量获取 Telegram 相关信息
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+ALLOWED_CHAT_IDS = os.environ.get("ALLOWED_CHAT_IDS")
+MAX_TELEGRAM_MSG_LENGTH = 4096  # Telegram 消息字数限制
+
+async def fetch_feed(session, feed):
     try:
-        connection = await aiomysql.connect(
-            host=DB_HOST,
-            db=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD
-        )
-        return connection
+        async with session.get(feed, timeout=88) as response:
+            response.raise_for_status()
+            content = await response.read()
+            return parse(content)
     except Exception as e:
-        logging.error(f"Error while connecting to MySQL: {e}")
+        logging.error(f"Error fetching {feed}: {e}")
         return None
 
 async def send_message(bot, chat_id, text):
     try:
         if len(text) > MAX_TELEGRAM_MSG_LENGTH:
-            text = text[:MAX_TELEGRAM_MSG_LENGTH] + "..."  # 如果超过字节限制，进行截断
+            text = text[:MAX_TELEGRAM_MSG_LENGTH] + "..."
         await bot.send_message(chat_id=chat_id, text=text, parse_mode='Markdown')
         logging.info(f"Message sent to {chat_id}: {text}")
     except Exception as e:
         logging.error(f"Markdown send failed for {chat_id}: {e}")
         try:
-            await bot.send_message(chat_id=chat_id, text=text, parse_mode='HTML')  # 使用 HTML 作为回退格式
+            await bot.send_message(chat_id=chat_id, text=text, parse_mode='HTML')
         except Exception as fallback_e:
             logging.error(f"HTML send failed: {fallback_e}")
-            await bot.send_message(chat_id=chat_id, text=text)  # 最后尝试纯文本发送
+            await bot.send_message(chat_id=chat_id, text=text)
 
 async def process_feed(session, feed, sent_entries, connection, bot, allowed_chat_ids, table_name):
     feed_data = await fetch_feed(session, feed)
@@ -75,12 +70,10 @@ async def process_feed(session, feed, sent_entries, connection, bot, allowed_cha
             messages.append(message)
             new_entries.append((url, subject, message_id))
 
-            # 将新条目保存到数据库
             current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             await save_sent_entry_to_db(connection, url if url else current_time, subject if subject else current_time, message_id if message_id else current_time, table_name)
             sent_entries.add((url if url else current_time, subject if subject else current_time, message_id if message_id else current_time))
 
-    # 合并消息并发送
     if messages:
         combined_message = "\n\n".join(messages)
         for chat_id in allowed_chat_ids:
@@ -91,10 +84,10 @@ async def process_feed(session, feed, sent_entries, connection, bot, allowed_cha
 async def connect_to_db():
     try:
         connection = await aiomysql.connect(
-            host='db4free.net',
-            db='penggan0',
-            user='penggan0',
-            password='fkuefggh'
+            host=os.environ.get("DB_HOST"),
+            db=os.environ.get("DB_NAME"),
+            user=os.environ.get("DB_USER"),
+            password=os.environ.get("DB_PASSWORD")
         )
         return connection
     except Exception as e:
