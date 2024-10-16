@@ -12,15 +12,21 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # RSS 源列表合并推送 定时24小时
 RSS_FEEDS = [
-    'https://rsshub.app/bilibili/hot-search',
-    'https://rss.mifaw.com/articles/5c8bb11a3c41f61efd36683e/5c91d2e23882afa09dff4901',
-    'https://rss.mifaw.com/articles/5c8bb11a3c41f61efd36683e/5cac99a7f5648c90ed310e18',
-    'https://rss.mifaw.com/articles/5c8bb11a3c41f61efd36683e/5cf92d7f0cc93bc69d082608',
-    'https://rsshub.app/guancha/headline',
-    'https://rsshub.app/zaobao/znews/china',
-    'https://blog.090227.xyz/atom.xml',
-    'https://www.freedidi.com/feed',
-    'https://36kr.com/feed',
+    'https://rsshub.app/bilibili/hot-search',  # bilibili
+    'https://rss.mifaw.com/articles/5c8bb11a3c41f61efd36683e/5c91d2e23882afa09dff4901',  # 36氪 - 24小时热榜
+    'https://rss.mifaw.com/articles/5c8bb11a3c41f61efd36683e/5cac99a7f5648c90ed310e18',  # 微博热搜
+    'https://rss.mifaw.com/articles/5c8bb11a3c41f61efd36683e/5cf92d7f0cc93bc69d082608',  # 百度热搜榜
+    'https://rsshub.app/guancha/headline',  # 观察网
+ #   'https://rsshub.app/zaobao/znews/china',  # 联合早报
+    'https://blog.090227.xyz/atom.xml',  # CM
+    'https://www.freedidi.com/feed', # 零度解说
+    'https://36kr.com/feed',  # 36氪
+    'https://www.zhihu.com/rss', #  知呼
+    'https://www.huxiu.com/rss/0.xml',  #  虎嗅网
+    'https://plink.anyfeeder.com/zaobao/realtime/china', # 联合早报
+    'https://www.youtube.com/feeds/videos.xml?channel_id=UCOSmkVK2xsihzKXQgiXPS4w', # 历史哥
+    'https://www.youtube.com/feeds/videos.xml?channel_id=UCSYBgX9pWGiUAcBxjnj6JCQ', # 郭正亮頻道
+    'https://www.ithome.com/rss/', # IT之家
 ]
 
 # 从环境变量获取 Telegram 相关信息
