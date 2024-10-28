@@ -201,7 +201,7 @@ def fetch_emails():
 主题: {subject}
 发件人: {sender}
 时间: {email_date_bj.strftime('%Y-%m-%d %H:%M:%S')}
-内容:---
+内容:
 {body}
 '''
                 send_message(message)
